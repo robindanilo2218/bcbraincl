@@ -1,0 +1,846 @@
+
+Visión general creada por IA
+Contenido HTML/JavaScript que define la lógica de una aplicación 'Nube Mental' para la gestión de horarios y tareas con configuración de turnos rotativos.
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Nube Mental | Tu RAM Externa</title>
+    <!-- Tailwind CSS (Se cachea para uso offline) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Correcciones de interfaz nativa para teléfonos */
+        .h-screen-dvh { height: 100vh; height: 100dvh; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { -webkit-tap-highlight-color: transparent; }
+        
+        /* Padding inferior para iPhones y pantallas sin bordes */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 1rem); }
+        
+        /* Animación fluida para modales emergentes */
+        @keyframes slideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .slide-up { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans overflow-hidden">
+    
+    <!-- Contenedor Principal Adaptativo -->
+    <div id="app" class="flex flex-col md:flex-row h-screen-dvh w-full bg-slate-950 relative"></div>
+
+    <script>
+        // ==========================================
+        // 1. DICCIONARIO DE ÍCONOS SVG
+        // ==========================================
+        const ICONS = {
+            Sun: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>`,
+            Moon: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`,
+            Droplet: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>`,
+            Bath: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6 6.5 3.5a1.5 1.5 0 0 0-1-.5C4.683 3 4 3.683 4 4.5V17a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><line x1="10" x2="8" y1="5" y2="7"/><line x1="2" x2="22" y1="12" y2="12"/><line x1="7" x2="7" y1="19" y2="21"/><line x1="17" x2="17" y1="19" y2="21"/></svg>`,
+            Shirt: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>`,
+            Utensils: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>`,
+            Coffee: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="9" x2="9" y1="2" y2="4"/><line x1="13" x2="13" y1="2" y2="4"/><line x1="17" x2="17" y1="2" y2="4"/></svg>`,
+            Car: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>`,
+            Activity: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.48 12H2"/></svg>`,
+            Home: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+            Briefcase: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`,
+            Clock: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+            Settings: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
+            Plus: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>`,
+            RefreshCw: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>`,
+            Trash2: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`,
+            CalendarCheck: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>`,
+            Edit2: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>`,
+            X: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>`,
+            Folder: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`,
+            CheckSquare: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>`,
+            Square: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>`,
+            AlertTriangle: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
+            CheckCircle2: `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`,
+            Circle: `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>`,
+            CalendarPlus: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><path d="M21 13V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8"/><path d="M3 10h18"/><path d="M19 16v6"/><path d="M16 19h6"/></svg>`,
+            Bell: `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`
+        };
+
+        // ==========================================
+        // 2. UTILIDADES
+        // ==========================================
+        const getTodayStr = () => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
+        const formatDateFriendly = (dateStr) => {
+            const d = new Date(dateStr + 'T12:00:00');
+            return new Intl.DateTimeFormat('es-ES', { weekday: 'short', day: '2-digit', month: 'short' }).format(d);
+        };
+
+        const getRecentMondayStr = (baseDate = new Date()) => {
+            const d = new Date(baseDate);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            const mon = new Date(d.setDate(diff));
+            return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+        };
+
+        const timeToMins = (timeStr) => {
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+        };
+
+        const minsToTime = (mins) => {
+            let h = Math.floor(mins / 60) % 24;
+            if (h < 0) h += 24;
+            let m = mins % 60;
+            if (m < 0) m += 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        };
+
+        // ==========================================
+        // 3. DATOS BASE
+        // ==========================================
+        const ROTATION_CYCLES = [
+            { id: 'cycle_night', name: 'Semana Noche (21-06)', mon_sat: { start: '21:00', end: '06:00', name: 'Noche' }, sun: { start: '10:00', end: '10:00', name: 'Día Libre', isOff: true } },
+            { id: 'cycle_afternoon', name: 'Semana Tarde (14-21)', mon_sat: { start: '14:00', end: '21:00', name: 'Tarde' }, sun: { start: '06:00', end: '18:00', name: 'Domingo (06-18)' } },
+            { id: 'cycle_morning', name: 'Semana Mañana (06-14)', mon_sat: { start: '06:00', end: '14:00', name: 'Mañana' }, sun: { start: '18:00', end: '06:00', name: 'Domingo Noche' } }
+        ];
+
+        const defaultTasks = [
+            { id: '1', title: 'Levantarme', anchor: 'work_start', offset: -120, icon: 'Sun', shiftFilter: 'all' },
+            { id: '2', title: 'Rutina (Baño, Cambiarme)', anchor: 'work_start', offset: -90, icon: 'Bath', shiftFilter: 'all' },
+            { id: '3', title: 'Comer algo', anchor: 'work_start', offset: -45, icon: 'Coffee', shiftFilter: 'all' },
+            { id: '4', title: 'Ir al trabajo', anchor: 'work_start', offset: -30, icon: 'Car', shiftFilter: 'all' }
+        ];
+
+        // ==========================================
+        // 4. MOTOR ESTABLE DE LA APP
+        // ==========================================
+        let state = {
+            activeTab: 'timeline',
+            today: getTodayStr(),
+            rotationConfig: { 
+                scheduleType: 'rotation_3', 
+                anchorDate: getRecentMondayStr(), 
+                anchorCycleId: 'cycle_night', 
+                fixedStart: '08:00', 
+                fixedEnd: '17:00', 
+                p223Start: '06:00', 
+                p223End: '18:00',
+                alarmsEnabled: false // NUEVO: Estado de alarmas
+            },
+            overrides: {}, tasks: [...defaultTasks], projects: [], logs: {},
+            
+            taskForm: { id: null, title: '', anchor: 'work_start', offset: 0, icon: 'Activity', mode: 'time', timeValue: '', isOneOff: false, shiftFilter: 'all' },
+            projectForm: { title: '', context: 'personal' },
+            overrideForm: { date: '', isOff: false, start: '08:00', end: '17:00' },
+            itemForm: { projectId: null, text: '' }, 
+            
+            modals: { task: false, project: false, override: false, item: false },
+            dialog: { active: false, type: 'alert', message: '', onConfirm: null },
+            scrollPositions: { timeline: 0, settings: 0 }
+        };
+
+        const app = {
+            init() {
+                this.loadData();
+                this.render();
+                
+                // LOOP PRINCIPAL (Revisa cada minuto)
+                setInterval(() => {
+                    const now = new Date();
+                    const newToday = getTodayStr();
+                    
+                    // Cambio de día
+                    if (newToday !== state.today) {
+                        state.today = newToday;
+                        this.render();
+                    }
+
+                    // ALARMAS: Revisar si es hora de alguna tarea
+                    if (state.rotationConfig.alarmsEnabled && Notification.permission === "granted") {
+                        const currentMins = now.getHours() * 60 + now.getMinutes();
+                        const tasks = this.getCalculatedTasks();
+                        
+                        tasks.forEach(t => {
+                            // Si no es sistema, coincide el minuto, y NO está marcada como hecha hoy
+                            if (!t.isSystem && t.absoluteMins % 1440 === currentMins && !(state.logs[state.today] || []).includes(t.id)) {
+                                new Notification("Nube Mental", { 
+                                    body: "Hora de: " + t.title,
+                                    icon: "https://cdn-icons-png.flaticon.com/512/3233/3233483.png" // Icono genérico de cerebro/nube
+                                });
+                            }
+                        });
+                    }
+                }, 60000); // Revisa cada 60 segundos
+            },
+            
+            loadData() {
+                const ls = localStorage.getItem('lifeTrack_data');
+                if (ls) {
+                    const saved = JSON.parse(ls);
+                    state.rotationConfig = { ...state.rotationConfig, ...saved.rotationConfig };
+                    state.overrides = saved.overrides || state.overrides;
+                    state.tasks = saved.tasks || state.tasks;
+                    state.projects = saved.projects || state.projects;
+                    state.logs = saved.logs || state.logs;
+                }
+            },
+            
+            saveData() {
+                localStorage.setItem('lifeTrack_data', JSON.stringify({ rotationConfig: state.rotationConfig, overrides: state.overrides, tasks: state.tasks, projects: state.projects, logs: state.logs }));
+            },
+
+            // --- Google Calendar Export ---
+            exportToCalendar(taskId) {
+                const task = this.getCalculatedTasks().find(t => t.id === taskId);
+                if (!task) return;
+                
+                const title = encodeURIComponent(task.title);
+                const desc = encodeURIComponent("Exportado desde Nube Mental (RAM Externa).");
+                
+                // Parse date logic
+                const [year, month, day] = state.today.split('-');
+                let dateObj = new Date(year, month - 1, day);
+                dateObj.setMinutes(dateObj.getMinutes() + task.absoluteMins);
+                
+                // Formato YYYYMMDDTHHMMSSZ (UTC)
+                const toUTCFormat = (d) => d.toISOString().replace(/-|:|\.\d\d\d/g, '');
+                
+                const startStr = toUTCFormat(dateObj);
+                const endObj = new Date(dateObj.getTime() + 30 * 60000); // Default 30 min duration
+                const endStr = toUTCFormat(endObj);
+                
+                const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startStr}/${endStr}&details=${desc}`;
+                window.open(url, '_blank');
+            },
+
+            // --- Toggle Alarmas ---
+            toggleAlarms(checked) {
+                if (checked) {
+                    if (!("Notification" in window)) {
+                        this.showDialog('alert', "Tu navegador no soporta notificaciones web.");
+                        this.updateConfig('alarmsEnabled', false);
+                        return;
+                    }
+                    if (Notification.permission === "granted") {
+                        this.updateConfig('alarmsEnabled', true);
+                        this.showDialog('alert', "Notificaciones activadas. Recibirás avisos a tiempo real.");
+                    } else if (Notification.permission !== "denied") {
+                        Notification.requestPermission().then(permission => {
+                            if (permission === "granted") {
+                                this.updateConfig('alarmsEnabled', true);
+                                this.showDialog('alert', "¡Permiso concedido! Notificaciones de la Nube activadas.");
+                            } else {
+                                this.showDialog('alert', "Permiso denegado. Habilita las notificaciones en tu navegador.");
+                                this.updateConfig('alarmsEnabled', false);
+                            }
+                        }).catch(e => {
+                            // Prevenir error en iframes restrictivos
+                            this.showDialog('alert', "El entorno actual bloquea el permiso. Abre la app en una pestaña completa o instálala.");
+                            this.updateConfig('alarmsEnabled', false);
+                        });
+                    } else {
+                        this.showDialog('alert', "Permiso denegado permanentemente. Cambia esto en los ajustes de tu navegador.");
+                        this.updateConfig('alarmsEnabled', false);
+                    }
+                } else {
+                    this.updateConfig('alarmsEnabled', false);
+                }
+            },
+
+            // Cálculo de Turnos
+            getShiftForDate(dateStr) {
+                const targetDate = new Date(dateStr + 'T12:00:00');
+                const anchorDate = new Date(state.rotationConfig.anchorDate + 'T12:00:00');
+                const diffDays = Math.floor((targetDate - anchorDate) / (1000 * 60 * 60 * 24));
+                const dayOfWeek = targetDate.getDay();
+
+                let calcShift = { id: `auto_${dateStr}`, cycleId: 'unknown', name: 'Desconocido', start: '08:00', end: '17:00', isOff: false };
+
+                if (state.rotationConfig.scheduleType === 'fixed_day') {
+                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                    calcShift = { id: `auto_${dateStr}`, cycleId: 'fixed_day', name: isWeekend ? 'Fin de Semana Libre' : 'Día Normal', start: state.rotationConfig.fixedStart, end: state.rotationConfig.fixedEnd, isOff: isWeekend };
+                } else if (state.rotationConfig.scheduleType === 'pattern_223') {
+                    let dayInCycle = diffDays % 14;
+                    if (dayInCycle < 0) dayInCycle += 14;
+                    const isWork = [0, 1, 4, 5, 6, 9, 10].includes(dayInCycle);
+                    calcShift = { id: `auto_${dateStr}`, cycleId: 'pattern_223', name: isWork ? 'Turno 2-2-3' : 'Descanso 2-2-3', start: state.rotationConfig.p223Start, end: state.rotationConfig.p223End, isOff: !isWork };
+                } else {
+                    const weeksDiff = Math.floor(diffDays / 7);
+                    const cycleIndex = ROTATION_CYCLES.findIndex(c => c.id === state.rotationConfig.anchorCycleId) || 0;
+                    let currentCycleIndex = (cycleIndex + (weeksDiff % 3)) % 3;
+                    if (currentCycleIndex < 0) currentCycleIndex += 3;
+                    const activeCycle = ROTATION_CYCLES[currentCycleIndex];
+                    const shiftDef = dayOfWeek === 0 ? activeCycle.sun : activeCycle.mon_sat;
+                    calcShift = { id: `auto_${dateStr}`, cycleId: activeCycle.id, name: `${activeCycle.name.split(' ')[1]} -> ${shiftDef.name}`, start: shiftDef.start, end: shiftDef.end, isOff: shiftDef.isOff || false };
+                }
+
+                if (state.overrides[dateStr]) {
+                    const ov = state.overrides[dateStr];
+                    calcShift = { ...calcShift, name: ov.isOff ? 'Día Libre (Modificado)' : 'Turno Modificado', start: ov.start, end: ov.end, isOff: ov.isOff, isOverride: true };
+                }
+                return calcShift;
+            },
+
+            getCalculatedTasks() {
+                const currentShift = this.getShiftForDate(state.today);
+                if (!currentShift) return [];
+                
+                const startMins = timeToMins(currentShift.start);
+                let endMins = timeToMins(currentShift.end);
+                if (endMins <= startMins && !currentShift.isOff) endMins += 1440; 
+
+                const filteredTasks = state.tasks.filter(t => 
+                    (!t.dateOnly || t.dateOnly === state.today) && 
+                    (t.shiftFilter === 'all' || t.shiftFilter === currentShift.cycleId || t.shiftFilter === state.rotationConfig.scheduleType)
+                );
+
+                let list = filteredTasks.map(task => {
+                    let absoluteMins = task.anchor === 'work_start' ? startMins + task.offset : (task.anchor === 'work_end' ? endMins + task.offset : task.offset);
+                    return { ...task, absoluteMins, timeStr: absoluteMins >= 1440 ? `${minsToTime(absoluteMins)} (+1d)` : minsToTime(absoluteMins) };
+                });
+
+                if (!currentShift.isOff) {
+                    list.push({ id: 'work_block_start', title: `Inicio del Trabajo`, icon: 'Briefcase', absoluteMins: startMins, timeStr: currentShift.start, isSystem: true, anchor: 'work_start' });
+                    list.push({ id: 'work_block_end', title: `Fin del Trabajo`, icon: 'Home', absoluteMins: endMins, timeStr: minsToTime(endMins) + (endMins >= 1440 ? ' (+1d)' : ''), isSystem: true, anchor: 'work_end' });
+                } else {
+                    list.push({ id: 'work_block_off', title: `¡Día Libre!`, icon: 'Sun', absoluteMins: startMins, timeStr: '--:--', isSystem: true });
+                }
+                return list.sort((a, b) => a.absoluteMins - b.absoluteMins);
+            },
+
+            // ==========================================
+            // RENDERIZADO VISUAL
+            // ==========================================
+            render() {
+                const appDiv = document.getElementById('app');
+                const mainEl = document.getElementById('main-scroll');
+                
+                if (mainEl) state.scrollPositions[state.activeTab] = mainEl.scrollTop;
+                const carousels = document.querySelectorAll('.carousel-scroll');
+                carousels.forEach((el, index) => { state.scrollPositions['carousel_' + index] = el.scrollLeft; });
+
+                const navItems = `
+                    <button onclick="app.switchTab('timeline')" class="flex md:flex-row flex-col items-center md:justify-start justify-center w-20 md:w-full h-14 md:h-12 md:px-4 rounded-2xl md:rounded-xl transition-all ${state.activeTab === 'timeline' ? 'text-emerald-400 md:bg-emerald-400/10 scale-105 md:scale-100' : 'text-slate-500 hover:text-slate-300 md:hover:bg-slate-800'}">
+                        <div class="mb-1 md:mb-0 md:mr-3">${ICONS.Clock}</div><span style="font-size: 10px;" class="md:text-sm font-medium">En Ejecución</span>
+                    </button>
+                    <button onclick="app.switchTab('settings')" class="flex md:flex-row flex-col items-center md:justify-start justify-center w-20 md:w-full h-14 md:h-12 md:px-4 rounded-2xl md:rounded-xl transition-all ${state.activeTab === 'settings' ? 'text-emerald-400 md:bg-emerald-400/10 scale-105 md:scale-100' : 'text-slate-500 hover:text-slate-300 md:hover:bg-slate-800'}">
+                        <div class="mb-1 md:mb-0 md:mr-3">${ICONS.Settings}</div><span style="font-size: 10px;" class="md:text-sm font-medium">Sistema</span>
+                    </button>
+                `;
+
+                appDiv.innerHTML = `
+                    <header class="md:hidden px-5 py-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center shrink-0" style="z-index: 10;">
+                        <div>
+                            <h1 class="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Nube Mental</h1>
+                            <p class="text-xs text-slate-400 uppercase tracking-wider">Memoria Activa • ${state.today}</p>
+                        </div>
+                        <button onclick="window.location.reload(true)" class="p-2 bg-slate-800 rounded-full text-slate-300 hover:text-white transition active:scale-95">${ICONS.RefreshCw}</button>
+                    </header>
+                    
+                    <aside class="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 shrink-0" style="z-index: 10;">
+                        <div class="p-6 border-b border-slate-800">
+                            <h1 class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Nube Mental</h1>
+                            <p class="text-xs text-slate-400 uppercase tracking-wider mt-1">Tu RAM Externa • ${state.today}</p>
+                        </div>
+                        <nav class="flex-1 p-4 space-y-2">
+                            ${navItems}
+                        </nav>
+                        <div class="p-4 border-t border-slate-800">
+                            <button onclick="window.location.reload(true)" class="flex items-center justify-center gap-2 text-slate-400 hover:text-white transition w-full p-3 rounded-xl hover:bg-slate-800">
+                                <span class="w-4 h-4">${ICONS.RefreshCw}</span> <span class="text-sm font-medium">Sincronizar</span>
+                            </button>
+                        </div>
+                    </aside>
+
+                    <main id="main-scroll" class="flex-1 overflow-y-auto relative pb-24 md:pb-0">
+                        <div class="w-full h-full">
+                            ${state.activeTab === 'timeline' ? this.renderTimeline() : this.renderSettings()}
+                        </div>
+                    </main>
+
+                    <nav class="md:hidden fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pb-safe" style="z-index: 40;">
+                        <div class="flex justify-around items-center p-2">
+                            ${navItems}
+                        </div>
+                    </nav>
+
+                    ${this.renderModals()}
+                `;
+
+                const newMainEl = document.getElementById('main-scroll');
+                if (newMainEl) newMainEl.scrollTop = state.scrollPositions[state.activeTab] || 0;
+                
+                const newCarousels = document.querySelectorAll('.carousel-scroll');
+                newCarousels.forEach((el, index) => {
+                    if(state.scrollPositions['carousel_' + index]) el.scrollLeft = state.scrollPositions['carousel_' + index];
+                });
+            },
+
+            renderCarousel(contextLabel, contextType) {
+                const contextProjects = state.projects.filter(p => p.context === contextType);
+                
+                let cards = contextProjects.map(proj => {
+                    const progress = proj.items.length ? Math.round((proj.items.filter(i=>i.done).length/proj.items.length)*100) : 0;
+                    let itemsHtml = proj.items.map(item => `
+                        <div class="flex items-start gap-1 mb-1.5 w-full">
+                            <label class="flex items-start gap-2 cursor-pointer flex-1 min-w-0 group">
+                                <div onclick="app.toggleProjectItem('${proj.id}', '${item.id}')" class="mt-0.5 shrink-0">
+                                    ${item.done ? `<span class="text-emerald-500">${ICONS.CheckSquare}</span>` : `<span class="text-slate-500">${ICONS.Square}</span>`}
+                                </div>
+                                <span class="text-xs leading-tight transition-all truncate whitespace-normal ${item.done ? 'line-through text-slate-500' : 'text-slate-300'}">${item.text}</span>
+                            </label>
+                            <button onclick="app.deleteProjectItem('${proj.id}', '${item.id}')" class="text-slate-700 hover:text-rose-400 active:text-rose-500 shrink-0 px-1 py-0.5"><span class="w-3 h-3 block">${ICONS.X}</span></button>
+                        </div>
+                    `).join('');
+
+                    return `
+                    <div class="snap-start shrink-0 w-[260px] md:w-[280px] bg-slate-900 border border-slate-700/50 rounded-2xl p-4 shadow-md flex flex-col">
+                        <div class="flex justify-between items-center mb-3 gap-2">
+                            <h5 class="font-semibold text-sm text-slate-200 truncate flex-1">${proj.title}</h5>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span style="font-size: 11px; font-weight: 700;" class="text-cyan-400">${progress}%</span>
+                                <button onclick="app.deleteProject('${proj.id}')" class="text-slate-600 hover:text-rose-500 transition"><span class="w-3.5 h-3.5 block">${ICONS.Trash2}</span></button>
+                            </div>
+                        </div>
+                        <div class="flex-1 overflow-y-auto max-h-32 hide-scrollbar mb-3">${itemsHtml}</div>
+                        
+                        <button onclick="app.openNewItemModal('${proj.id}')" class="mt-auto text-[11px] font-medium text-cyan-400 hover:text-cyan-300 flex items-center justify-center gap-1.5 active:scale-95 transition bg-cyan-900/20 p-2.5 rounded-lg border border-cyan-900/50">
+                            <span class="inline-flex w-3.5 h-3.5 shrink-0 [&>svg]:w-full [&>svg]:h-full">${ICONS.Plus}</span> <span>Cargar a RAM</span>
+                        </button>
+                    </div>`;
+                }).join('');
+
+                return `
+                <div class="w-full mt-2 mb-8 md:max-w-3xl md:mx-auto">
+                    <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                        <span>${ICONS.Folder}</span> ${contextLabel}
+                    </h4>
+                    <div class="flex overflow-x-auto gap-4 pb-4 snap-x snap-mandatory hide-scrollbar carousel-scroll pr-6">
+                        ${cards}
+                        <div onclick="app.openNewProject('${contextType}')" class="snap-start shrink-0 w-24 border-2 border-dashed border-slate-700 hover:border-cyan-500 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-slate-500 hover:text-cyan-400 transition min-h-[140px] bg-slate-900/30 hover:bg-slate-800/50">
+                            <div class="mb-1 inline-flex w-6 h-6 shrink-0 [&>svg]:w-full [&>svg]:h-full justify-center items-center">${ICONS.Plus}</div>
+                            <span style="font-size: 10px; font-weight: 500;" class="text-center px-2 mt-1">Nuevo<br/>Bloque</span>
+                        </div>
+                    </div>
+                </div>`;
+            },
+
+            renderTimeline() {
+                const currentShift = this.getShiftForDate(state.today);
+                const tasks = this.getCalculatedTasks();
+                
+                let tasksHtml = tasks.map(task => {
+                    const isCompleted = (state.logs[state.today] || []).includes(task.id);
+                    const iconSvg = ICONS[task.icon] || ICONS.Activity;
+
+                    if (task.isSystem) {
+                        const carousel = task.id === 'work_block_start' ? this.renderCarousel("Bloques en RAM (Trabajo)", "work") : '';
+                        return `
+                        <div class="relative group md:max-w-3xl md:mx-auto">
+                            <div class="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-4 border-slate-950 bg-cyan-500" style="left: -35px; z-index: 5;"></div>
+                            
+                            <div class="flex gap-2 items-center mb-6">
+                                <div class="flex-1 p-3 sm:p-4 rounded-2xl border bg-cyan-950/20 border-cyan-900/40 shadow-sm">
+                                    <div class="flex justify-between items-center">
+                                        <div class="flex items-center gap-3">
+                                            <div class="p-2 rounded-xl bg-cyan-900/50 text-cyan-400 shrink-0">${iconSvg}</div>
+                                            <div class="min-w-0">
+                                                <h3 class="font-medium text-base text-cyan-300 truncate">${task.title}</h3>
+                                                <div class="flex items-center gap-1 text-[10px] sm:text-xs text-slate-400 mt-0.5">
+                                                    <span class="inline-flex w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0 [&>svg]:w-full [&>svg]:h-full">${ICONS.Clock}</span> <span>${task.timeStr}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-1 shrink-0">
+                                            <button onclick="app.exportToCalendar('${task.id}')" title="Enviar a Google Calendar" class="p-2 text-indigo-400 bg-cyan-950/50 hover:bg-cyan-900 transition rounded-lg shrink-0">${ICONS.CalendarPlus}</button>
+                                            <button onclick="app.openAddAfterModal('${task.id}')" title="Añadir rutina aquí" class="p-2 text-cyan-400 bg-cyan-950/50 hover:bg-cyan-900 transition rounded-lg shrink-0">${ICONS.Plus}</button>
+                                            <button onclick="app.showDialog('alert', 'Este es un Bloque Maestro. Su hora se define automáticamente basándose en tu ciclo de trabajo. Para cambiar su horario general, ve a la pestaña Sistema.')" title="Información del Sistema" class="p-2 text-slate-400 bg-cyan-950/50 hover:bg-cyan-900 transition rounded-lg shrink-0 hidden md:block">${ICONS.Settings}</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            ${carousel}
+                        </div>`;
+                    }
+
+                    return `
+                    <div class="relative group mb-6 md:max-w-3xl md:mx-auto">
+                        <div class="absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-4 border-slate-950 ${isCompleted ? 'bg-emerald-500' : 'bg-slate-700'} transition-colors" style="left: -35px; z-index: 5;"></div>
+                        
+                        <div class="flex gap-2 items-center">
+                            <div onclick="app.toggleTask('${task.id}')" class="flex-1 p-3 sm:p-4 rounded-2xl border transition-all bg-slate-900 border-slate-800 cursor-pointer shadow-sm hover:border-slate-700 md:hover:scale-[1.01] ${isCompleted ? 'opacity-50 border-emerald-900/30 hover:border-emerald-900/50' : ''}">
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        <div class="p-2 rounded-xl shrink-0 ${isCompleted ? 'bg-emerald-950 text-emerald-400' : 'bg-slate-800 text-slate-300'} transition-colors">${iconSvg}</div>
+                                        <div class="min-w-0 pr-2">
+                                            <h3 class="font-medium text-base truncate transition-colors ${isCompleted ? 'line-through text-slate-500' : 'text-slate-200'}">
+                                                ${task.title} ${task.dateOnly ? '<span style="font-size: 9px;" class="ml-2 bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30 relative -top-0.5">Solo hoy</span>' : ''}
+                                            </h3>
+                                            <div class="flex items-center gap-1 text-[10px] sm:text-xs text-slate-400 mt-0.5">
+                                                <span class="inline-flex w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0 [&>svg]:w-full [&>svg]:h-full">${ICONS.Clock}</span> <span class="${task.timeStr.includes('+1d') ? 'text-indigo-400 font-medium' : ''}">${task.timeStr}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="shrink-0 ml-1 transition-colors">${isCompleted ? `<span class="text-emerald-500">${ICONS.CheckCircle2}</span>` : `<span class="text-slate-700">${ICONS.Circle}</span>`}</div>
+                                </div>
+                            </div>
+                            <!-- BOTONERA DERECHA: Ahora incluye Google Calendar -->
+                            <div class="flex flex-col gap-1 shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                <button onclick="app.exportToCalendar('${task.id}')" title="Enviar a Google Calendar" class="p-2 text-indigo-400 bg-slate-900 border border-slate-800 rounded-lg hover:bg-indigo-900/30 active:scale-95 transition-all">${ICONS.CalendarPlus}</button>
+                                <button onclick="app.openAddAfterModal('${task.id}')" title="Añadir rutina aquí" class="p-2 text-cyan-400 bg-slate-900 border border-slate-800 rounded-lg hover:bg-cyan-900/30 active:scale-95 transition-all">${ICONS.Plus}</button>
+                                <button onclick="app.openEditModal('${task.id}')" title="Editar rutina" class="p-2 text-amber-400 bg-slate-900 border border-slate-800 rounded-lg hover:bg-amber-900/30 active:scale-95 transition-all">${ICONS.Edit2}</button>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+
+                return `
+                <div class="p-5 md:p-8">
+                    <div class="mb-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-5 flex justify-between shadow-sm border-l-4 md:max-w-3xl md:mx-auto ${currentShift.isOverride ? 'border-l-amber-500' : 'border-l-emerald-500'}">
+                        <div class="flex gap-4 text-slate-300 items-center">
+                            <span class="${currentShift.isOverride ? 'text-amber-400' : 'text-emerald-400'} md:scale-125">${currentShift.isOverride ? ICONS.AlertTriangle : ICONS.Briefcase}</span>
+                            <div class="flex flex-col">
+                                <span style="font-size: 10px;" class="uppercase tracking-wider text-slate-500 font-bold md:text-xs">${currentShift.isOverride ? 'Contexto Modificado' : 'Contexto Activo'}</span>
+                                <span class="text-sm font-semibold text-slate-100 md:text-lg">${currentShift.name}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="relative border-l-2 border-slate-800 ml-2 pl-6 pt-2 md:max-w-4xl md:mx-auto">
+                        ${this.renderCarousel("Bloques en RAM (Personal)", "personal")}
+                        ${tasksHtml}
+                    </div>
+                </div>`;
+            },
+
+            renderSettings() {
+                const conf = state.rotationConfig;
+                const cycleOptions = ROTATION_CYCLES.map(c => `<option value="${c.id}" ${conf.anchorCycleId === c.id ? 'selected' : ''}>${c.name}</option>`).join('');
+                
+                let calendarHtml = '';
+                for(let i=0; i<7; i++) {
+                    let d = new Date(); d.setDate(d.getDate() + i);
+                    let dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    let shift = this.getShiftForDate(dateStr);
+                    let isToday = dateStr === state.today;
+                    calendarHtml += `
+                    <div class="flex justify-between items-center p-3 rounded-xl border ${isToday ? 'bg-slate-800 border-emerald-900/50' : 'bg-slate-950 border-slate-800 hover:border-slate-700 transition-colors'} mb-2">
+                        <div class="flex-1 min-w-0 pr-2">
+                            <span class="text-sm ${isToday ? 'text-emerald-400 font-semibold' : 'text-slate-300'} block truncate">${isToday ? 'Hoy' : formatDateFriendly(dateStr)}</span>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                <span style="font-size: 11px;" class="font-medium truncate ${shift.isOff ? 'text-slate-500' : 'text-slate-400'} ${shift.isOverride ? 'text-amber-400' : ''}">
+                                    ${shift.name} ${shift.isOff ? '' : `(${shift.start}-${shift.end})`}
+                                </span>
+                                ${shift.isOverride ? `<span style="font-size: 9px;" class="bg-amber-500/20 text-amber-300 px-1 rounded shrink-0">Excepción</span>` : ''}
+                            </div>
+                        </div>
+                        <button onclick="app.openOverrideModal('${dateStr}')" class="p-2 text-slate-400 bg-slate-900 hover:bg-slate-800 hover:text-cyan-400 rounded-lg border border-slate-800 shrink-0 active:scale-95 transition-all">${ICONS.Edit2}</button>
+                    </div>`;
+                }
+
+                let tasksHtml = state.tasks.filter(t => !t.dateOnly).map(t => `
+                    <div class="flex justify-between items-center bg-slate-950 border border-slate-800 hover:border-slate-700 p-3 rounded-xl mb-2 cursor-pointer active:scale-[0.98] transition-all" onclick="app.openEditModal('${t.id}')">
+                        <div class="flex-1 min-w-0 pr-3">
+                            <p class="text-sm font-medium text-slate-200 truncate">${t.title}</p>
+                            <span style="font-size: 10px;" class="text-slate-500">${t.shiftFilter === 'all' ? 'Siempre' : 'Condicionado'}</span>
+                        </div>
+                        <span class="text-slate-500 shrink-0">${ICONS.Edit2}</span>
+                    </div>`).join('');
+
+                return `
+                <div class="p-5 md:p-8 pb-12 max-w-6xl mx-auto">
+                    <h2 class="text-xl font-semibold flex items-center gap-2 text-slate-200 mb-6"><span class="text-indigo-400">${ICONS.Settings}</span> Sistema (Ajustes de la Nube)</h2>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+                        
+                        <!-- Columna Izquierda: Configuración -->
+                        <div class="space-y-6">
+                            
+                            <!-- SECCIÓN NUEVA: ALARMAS Y NOTIFICACIONES -->
+                            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-sm border-l-4 border-l-amber-500">
+                                <h3 class="text-sm md:text-base font-medium text-slate-300 mb-3 flex items-center gap-2"><span class="text-amber-400">${ICONS.Bell}</span> Alertas Locales</h3>
+                                <p class="text-xs text-slate-400 mb-4 leading-relaxed">Permite a la Nube Mental enviarte notificaciones al dispositivo cuando sea la hora de una rutina.</p>
+                                <label class="flex items-center gap-3 cursor-pointer bg-slate-950 p-4 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
+                                    <input type="checkbox" ${conf.alarmsEnabled ? 'checked' : ''} onchange="app.toggleAlarms(this.checked)" class="w-6 h-6 rounded accent-amber-500 cursor-pointer">
+                                    <span class="text-sm md:text-base font-medium text-slate-200">Habilitar notificaciones a tiempo real</span>
+                                </label>
+                            </div>
+
+                            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 border-l-4 border-l-indigo-500 shadow-sm">
+                                <h3 class="text-sm md:text-base font-medium text-slate-300 mb-3 flex items-center gap-2">Ciclo de Trabajo (Contexto Principal)</h3>
+                                <select onchange="app.updateConfig('scheduleType', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 mb-4 text-sm font-medium hover:border-indigo-500 transition-colors cursor-pointer">
+                                    <option value="rotation_3" ${conf.scheduleType === 'rotation_3' ? 'selected' : ''}>Rotativo 3 Turnos</option>
+                                    <option value="pattern_223" ${conf.scheduleType === 'pattern_223' ? 'selected' : ''}>Patrón 2-2-3</option>
+                                    <option value="fixed_day" ${conf.scheduleType === 'fixed_day' ? 'selected' : ''}>Fijo de Día (L-V)</option>
+                                </select>
+
+                                ${conf.scheduleType === 'rotation_3' ? `
+                                <div class="space-y-4 pt-4 border-t border-slate-800">
+                                    <div><label class="text-xs text-slate-400 block mb-1">Semana actual inició el Lunes:</label><input type="date" value="${conf.anchorDate}" onchange="app.updateConfig('anchorDate', app.getRecentMonday(this.value))" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-3 text-sm cursor-pointer"></div>
+                                    <div><label class="text-xs text-slate-400 block mb-1">¿Qué turno te tocó esa semana?</label><select onchange="app.updateConfig('anchorCycleId', this.value)" class="w-full bg-slate-950 border border-slate-700 text-emerald-400 font-medium rounded-xl p-3 text-sm cursor-pointer">${cycleOptions}</select></div>
+                                </div>` : ''}
+
+                                ${conf.scheduleType === 'pattern_223' ? `
+                                <div class="space-y-4 pt-4 border-t border-slate-800">
+                                    <div><label class="text-xs text-slate-400 block mb-1">Día 1 de inicio del ciclo 2-2-3:</label><input type="date" value="${conf.anchorDate}" onchange="app.updateConfig('anchorDate', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-3 text-sm cursor-pointer"></div>
+                                    <div class="flex gap-3">
+                                        <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Entrada</label><input type="time" value="${conf.p223Start}" onchange="app.updateConfig('p223Start', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-3 text-sm cursor-pointer"></div>
+                                        <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Salida</label><input type="time" value="${conf.p223End}" onchange="app.updateConfig('p223End', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-3 text-sm cursor-pointer"></div>
+                                    </div>
+                                </div>` : ''}
+
+                                ${conf.scheduleType === 'fixed_day' ? `
+                                <div class="flex gap-3 pt-4 border-t border-slate-800">
+                                    <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Entrada Normal</label><input type="time" value="${conf.fixedStart}" onchange="app.updateConfig('fixedStart', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-3 text-sm cursor-pointer"></div>
+                                    <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Salida Normal</label><input type="time" value="${conf.fixedEnd}" onchange="app.updateConfig('fixedEnd', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded-xl p-3 text-sm cursor-pointer"></div>
+                                </div>` : ''}
+                            </div>
+
+                            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-sm">
+                                <h3 class="text-sm md:text-base font-medium text-slate-300 mb-4 flex items-center gap-2"><span class="text-emerald-400">${ICONS.Activity}</span> Procesos en Segundo Plano (Rutinas Fijas)</h3>
+                                <div>${tasksHtml}</div>
+                            </div>
+                        </div>
+
+                        <!-- Columna Derecha: Calendario -->
+                        <div class="space-y-6">
+                            <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-sm h-full flex flex-col">
+                                <h3 class="text-sm md:text-base font-medium text-slate-300 mb-4 flex items-center gap-2"><span class="text-cyan-400">${ICONS.CalendarCheck}</span> Previsión de Memoria (Calendario)</h3>
+                                <p class="text-xs text-slate-400 mb-4 leading-relaxed">Configura excepciones en tu ciclo para que la Nube sepa qué contexto cargar en RAM ese día.</p>
+                                <div class="flex-1">${calendarHtml}</div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>`;
+            },
+
+            renderModals() {
+                let html = '';
+                const tf = state.taskForm;
+                const pf = state.projectForm;
+                const of = state.overrideForm;
+                const inf = state.itemForm;
+
+                const modalWrapperStart = (name, zIndex) => `
+                    <div class="fixed inset-0 flex flex-col justify-end md:justify-center md:items-center" style="z-index: ${zIndex};">
+                        <div class="absolute inset-0 bg-slate-950 bg-opacity-70 backdrop-blur-sm transition-opacity" onclick="app.closeModal('${name}')"></div>
+                        <div class="relative bg-slate-900 w-full md:w-[500px] md:max-w-[90vw] mx-auto rounded-t-3xl md:rounded-2xl p-6 md:p-8 shadow-2xl border-t md:border border-slate-800 pb-safe md:pb-8 slide-up" style="max-height: 90vh; overflow-y: auto;">
+                `;
+                const modalWrapperEnd = `</div></div>`;
+
+                if (state.modals.task) {
+                    const shiftOptions = state.rotationConfig.scheduleType === 'rotation_3' ? 
+                        `<option value="cycle_night" ${tf.shiftFilter=='cycle_night'?'selected':''}>SOLO en Noche</option><option value="cycle_afternoon" ${tf.shiftFilter=='cycle_afternoon'?'selected':''}>SOLO en Tarde</option><option value="cycle_morning" ${tf.shiftFilter=='cycle_morning'?'selected':''}>SOLO en Mañana</option>` 
+                        : (state.rotationConfig.scheduleType === 'pattern_223' ? `<option value="pattern_223" ${tf.shiftFilter=='pattern_223'?'selected':''}>SOLO en turno 2-2-3</option>` : '');
+
+                    html += modalWrapperStart('task', 50) + `
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-lg md:text-xl font-bold text-slate-100 flex items-center gap-2"><span class="text-emerald-400">${tf.id ? ICONS.Edit2 : ICONS.Plus}</span> ${tf.id ? 'Editar' : 'Nueva'} Actividad</h3>
+                                <button onclick="app.closeModal('task')" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 transition-colors">${ICONS.X}</button>
+                            </div>
+                            <div class="space-y-4">
+                                <div><label class="text-xs text-slate-400 block mb-1">Nombre</label><input type="text" value="${tf.title}" oninput="app.updateForm('task', 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 text-base focus:border-cyan-500 outline-none transition-colors"></div>
+                                <div class="flex gap-3 md:gap-4">
+                                    <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Hora Exacta</label><input type="time" value="${tf.timeValue}" onchange="app.updateForm('task', 'timeValue', this.value); app.updateForm('task', 'mode', 'time')" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 cursor-pointer focus:border-cyan-500 outline-none transition-colors"></div>
+                                    <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Refiere a:</label><select onchange="app.updateForm('task', 'anchor', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 cursor-pointer focus:border-cyan-500 outline-none transition-colors"><option value="work_start" ${tf.anchor=='work_start'?'selected':''}>Entrada</option><option value="work_end" ${tf.anchor=='work_end'?'selected':''}>Salida</option></select></div>
+                                </div>
+                                
+                                <div>
+                                    <label class="text-xs text-slate-400 block mb-1">Frecuencia de la rutina</label>
+                                    <select onchange="app.updateForm('task', 'isOneOff', this.value === 'true'); if(this.value === 'true') app.updateForm('task', 'shiftFilter', 'all'); app.render();" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 text-sm md:text-base cursor-pointer focus:border-cyan-500 outline-none transition-colors">
+                                        <option value="false" ${!tf.isOneOff ? 'selected' : ''}>Fija (Repetir según el turno)</option>
+                                        <option value="true" ${tf.isOneOff ? 'selected' : ''}>Solo hoy (No repetir mañana)</option>
+                                    </select>
+                                </div>
+
+                                ${!tf.isOneOff ? `
+                                <div><label class="text-xs text-slate-400 block mb-1">¿En qué turnos aparece?</label><select onchange="app.updateForm('task', 'shiftFilter', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 text-sm md:text-base cursor-pointer focus:border-cyan-500 outline-none transition-colors"><option value="all" ${tf.shiftFilter === 'all' ? 'selected' : ''}>Siempre (Cualquier turno)</option>${shiftOptions}</select></div>
+                                ` : ''}
+                                
+                                <div class="pt-4 flex gap-3">
+                                    ${tf.id ? `<button onclick="app.deleteTask('${tf.id}')" class="px-5 bg-slate-800 text-rose-500 rounded-xl hover:bg-rose-500/10 active:scale-95 transition-all flex items-center justify-center">${ICONS.Trash2}</button>` : ''}
+                                    <button onclick="app.saveTask()" class="flex-1 text-white rounded-xl p-4 font-semibold text-base bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] transition-all shadow-lg shadow-emerald-900/20">Guardar Actividad</button>
+                                </div>
+                            </div>
+                    ` + modalWrapperEnd;
+                }
+
+                if (state.modals.project) {
+                    html += modalWrapperStart('project', 50) + `
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-lg md:text-xl font-bold text-slate-100">Nuevo Bloque de Memoria</h3>
+                                <button onclick="app.closeModal('project')" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 transition-colors w-10 h-10 flex justify-center items-center">${ICONS.X}</button>
+                            </div>
+                            <input type="text" placeholder="Ej. Tareas de la casa..." value="${pf.title}" oninput="app.updateForm('project', 'title', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-4 mb-6 text-base focus:border-cyan-500 outline-none transition-colors">
+                            <button onclick="app.saveProject()" class="w-full text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl p-4 font-semibold text-base active:scale-[0.98] transition-all shadow-lg shadow-cyan-900/20">Crear Bloque</button>
+                    ` + modalWrapperEnd;
+                }
+
+                if (state.modals.item) {
+                    html += modalWrapperStart('item', 60) + `
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-lg md:text-xl font-bold text-slate-100">Cargar en RAM</h3>
+                                <button onclick="app.closeModal('item')" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 transition-colors w-10 h-10 flex justify-center items-center">${ICONS.X}</button>
+                            </div>
+                            <input type="text" placeholder="Ej. Revisar cableado..." value="${inf.text}" oninput="app.updateForm('item', 'text', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-4 mb-6 text-base focus:border-cyan-500 outline-none transition-colors">
+                            <button onclick="app.saveItem()" class="w-full text-white bg-emerald-600 hover:bg-emerald-500 rounded-xl p-4 font-semibold text-base active:scale-[0.98] transition-all shadow-lg shadow-emerald-900/20">Guardar</button>
+                    ` + modalWrapperEnd;
+                }
+
+                if (state.modals.override) {
+                    html += modalWrapperStart('override', 50) + `
+                            <div class="flex justify-between items-center mb-5">
+                                <h3 class="text-lg md:text-xl font-bold text-slate-100">Modificar: ${formatDateFriendly(of.date)}</h3>
+                                <button onclick="app.closeModal('override')" class="text-slate-400 hover:text-white transition-colors bg-slate-800 rounded-full p-2">${ICONS.X}</button>
+                            </div>
+                            <div class="bg-amber-900/20 border border-amber-900/50 p-4 rounded-xl mb-6">
+                                <p class="text-sm text-amber-300 leading-relaxed">Cambia este día sin afectar la rotación de las demás semanas.</p>
+                            </div>
+                            <div class="space-y-4 mb-8">
+                                <label class="flex items-center gap-3 cursor-pointer bg-slate-950 p-4 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
+                                    <input type="checkbox" ${of.isOff ? 'checked' : ''} onchange="app.updateForm('override', 'isOff', this.checked); app.render()" class="w-6 h-6 rounded accent-amber-500 cursor-pointer">
+                                    <span class="text-sm md:text-base font-medium text-slate-200">Tomar este día como LIBRE</span>
+                                </label>
+                                ${!of.isOff ? `
+                                <div class="flex gap-4">
+                                    <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Entrada</label><input type="time" value="${of.start}" onchange="app.updateForm('override', 'start', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-4 text-base cursor-pointer focus:border-cyan-500 outline-none transition-colors"></div>
+                                    <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Salida</label><input type="time" value="${of.end}" onchange="app.updateForm('override', 'end', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-4 text-base cursor-pointer focus:border-cyan-500 outline-none transition-colors"></div>
+                                </div>` : ''}
+                            </div>
+                            <div class="flex gap-3 md:gap-4">
+                                ${state.overrides[of.date] ? `<button onclick="app.clearOverride('${of.date}')" class="flex-1 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl p-4 font-semibold active:scale-95 text-sm md:text-base transition-all">Borrar Excepción</button>` : ''}
+                                <button onclick="app.saveOverride()" class="flex-1 text-white bg-cyan-600 hover:bg-cyan-500 rounded-xl p-4 font-semibold active:scale-[0.98] text-base transition-all shadow-lg shadow-cyan-900/20">Guardar Cambios</button>
+                            </div>
+                    ` + modalWrapperEnd;
+                }
+
+                if (state.dialog.active) {
+                    html += `
+                    <div class="fixed inset-0 flex flex-col justify-center items-center" style="z-index: 100;">
+                        <div class="absolute inset-0 bg-slate-950 bg-opacity-70 backdrop-blur-sm transition-opacity" onclick="app.closeDialog()"></div>
+                        <div class="relative bg-slate-900 w-[90%] md:w-[400px] rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-800 slide-up text-center">
+                            <div class="mb-5 flex justify-center text-cyan-400 scale-125">
+                                ${state.dialog.type === 'confirm' ? ICONS.AlertTriangle : ICONS.Bell}
+                            </div>
+                            <h3 class="text-lg md:text-xl font-bold text-slate-100 mb-3">${state.dialog.type === 'confirm' ? 'Confirmar Acción' : 'Aviso del Sistema'}</h3>
+                            <p class="text-slate-400 text-sm md:text-base mb-8 leading-relaxed">${state.dialog.message}</p>
+                            <div class="flex gap-3 md:gap-4">
+                                ${state.dialog.type === 'confirm' ? `<button onclick="app.closeDialog()" class="flex-1 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-xl p-3 md:p-4 font-semibold transition-all">Cancelar</button>` : ''}
+                                <button onclick="app.confirmDialog()" class="flex-1 text-white ${state.dialog.type === 'confirm' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-cyan-600 hover:bg-cyan-500'} rounded-xl p-3 md:p-4 font-semibold transition-all shadow-lg">Aceptar</button>
+                            </div>
+                        </div>
+                    </div>`;
+                }
+
+                return html;
+            },
+
+            // ==========================================
+            // ACCIONES DEL USUARIO
+            // ==========================================
+            switchTab(tab) { state.activeTab = tab; this.saveData(); this.render(); },
+            updateConfig(key, value) { state.rotationConfig[key] = value; this.saveData(); this.render(); },
+            updateForm(form, key, value) { state[`${form}Form`][key] = value; },
+            getRecentMonday(dateStr) { return getRecentMondayStr(new Date(dateStr + 'T12:00:00')); },
+            
+            showDialog(type, message, onConfirm = null) { state.dialog = { active: true, type, message, onConfirm }; this.render(); },
+            closeDialog() { state.dialog.active = false; this.render(); },
+            confirmDialog() { if (state.dialog.onConfirm) state.dialog.onConfirm(); this.closeDialog(); },
+
+            toggleTask(id) {
+                const logs = state.logs[state.today] || [];
+                state.logs[state.today] = logs.includes(id) ? logs.filter(i => i !== id) : [...logs, id];
+                this.saveData(); this.render();
+            },
+            
+            closeModal(name) { state.modals[name] = false; this.render(); },
+            
+            openNewProject(context) { state.projectForm = { title: '', context }; state.modals.project = true; this.render(); },
+            saveProject() {
+                if(state.projectForm.title.trim()) {
+                    state.projects.push({ id: 'proj_' + Date.now(), title: state.projectForm.title.trim(), context: state.projectForm.context, items: [] });
+                    state.modals.project = false; this.saveData(); this.render();
+                }
+            },
+            deleteProject(projectId) {
+                this.showDialog('confirm', "¿Eliminar todo este bloque y sus rutinas de la memoria?", () => {
+                    state.projects = state.projects.filter(p => p.id !== projectId);
+                    this.saveData(); this.render();
+                });
+            },
+            openNewItemModal(projectId) { state.itemForm = { projectId: projectId, text: '' }; state.modals.item = true; this.render(); },
+            saveItem() {
+                if (state.itemForm.text.trim()) {
+                    state.projects = state.projects.map(p => {
+                        if (p.id === state.itemForm.projectId) return { ...p, items: [...p.items, { id: 'item_' + Date.now(), text: state.itemForm.text.trim(), done: false }] };
+                        return p;
+                    });
+                    state.modals.item = false; this.saveData(); this.render();
+                }
+            },
+            deleteProjectItem(projectId, itemId) {
+                state.projects = state.projects.map(p => {
+                    if (p.id === projectId) return { ...p, items: p.items.filter(i => i.id !== itemId) };
+                    return p;
+                });
+                this.saveData(); this.render();
+            },
+            toggleProjectItem(pId, iId) {
+                state.projects = state.projects.map(p => p.id === pId ? { ...p, items: p.items.map(i => i.id === iId ? { ...i, done: !i.done } : i) } : p);
+                this.saveData(); this.render();
+            },
+
+            openOverrideModal(date) {
+                const def = this.getShiftForDate(date);
+                state.overrideForm = { date, isOff: def.isOff, start: def.start, end: def.end };
+                state.modals.override = true; this.render();
+            },
+            saveOverride() {
+                state.overrides[state.overrideForm.date] = { isOff: state.overrideForm.isOff, start: state.overrideForm.start, end: state.overrideForm.end };
+                state.modals.override = false; this.saveData(); this.render();
+            },
+            clearOverride(date) { delete state.overrides[date]; state.modals.override = false; this.saveData(); this.render(); },
+            
+            openAddAfterModal(baseTaskId) {
+                const baseTask = state.tasks.find(t=>t.id === baseTaskId) || { anchor: 'work_start', offset: 0, isSystem: true };
+                const currentS = this.getShiftForDate(state.today);
+                const baseStr = baseTask.anchor === 'work_start' ? currentS.start : currentS.end;
+                const addedMins = baseTask.isSystem ? 0 : 15;
+                state.taskForm = { id: null, title: '', anchor: baseTask.anchor, offset: 0, icon: 'Activity', mode: 'time', timeValue: minsToTime(timeToMins(baseStr) + (baseTask.offset || 0) + addedMins), isOneOff: false, shiftFilter: 'all' };
+                state.modals.task = true; this.render();
+            },
+            openEditModal(id) {
+                const task = state.tasks.find(t=>t.id === id);
+                const currentS = this.getShiftForDate(state.today);
+                const baseStr = task.anchor === 'work_start' ? currentS.start : currentS.end;
+                state.taskForm = { id: task.id, title: task.title, anchor: task.anchor, offset: task.offset, icon: task.icon || 'Activity', timeValue: minsToTime(timeToMins(baseStr) + task.offset), mode: 'time', isOneOff: !!task.dateOnly, shiftFilter: task.shiftFilter || 'all' };
+                state.modals.task = true; this.render();
+            },
+            saveTask() {
+                if (!state.taskForm.title.trim()) return;
+                let diff = state.taskForm.offset;
+                if (state.taskForm.mode === 'time') {
+                    const currentS = this.getShiftForDate(state.today);
+                    diff = timeToMins(state.taskForm.timeValue) - timeToMins(state.taskForm.anchor === 'work_start' ? currentS.start : currentS.end);
+                    if (diff < -720) diff += 1440; if (diff > 720) diff -= 1440;
+                }
+                const finalTask = { id: state.taskForm.id || Date.now().toString(), title: state.taskForm.title.trim(), anchor: state.taskForm.anchor, offset: parseInt(diff), icon: state.taskForm.icon || 'Activity', dateOnly: state.taskForm.isOneOff ? state.today : null, shiftFilter: state.taskForm.shiftFilter };
+                if(state.taskForm.id) state.tasks = state.tasks.map(t => t.id === state.taskForm.id ? finalTask : t);
+                else state.tasks.push(finalTask);
+                state.modals.task = false; this.saveData(); this.render();
+            },
+            deleteTask(id) { state.tasks = state.tasks.filter(t => t.id !== id); state.modals.task = false; this.saveData(); this.render(); }
+        };
+
+        window.app = app;
+        window.onload = () => app.init();
+    </script>
+</body>
+</html>
