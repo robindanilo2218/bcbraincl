@@ -640,6 +640,13 @@
                                     <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Hora Exacta</label><input type="time" value="${tf.timeValue}" onchange="app.updateForm('task', 'timeValue', this.value); app.updateForm('task', 'mode', 'time')" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 cursor-pointer focus:border-cyan-500 outline-none transition-colors"></div>
                                     <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Refiere a:</label><select onchange="app.updateForm('task', 'anchor', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 cursor-pointer focus:border-cyan-500 outline-none transition-colors"><option value="work_start" ${tf.anchor=='work_start'?'selected':''}>Entrada</option><option value="work_end" ${tf.anchor=='work_end'?'selected':''}>Salida</option></select></div>
                                 </div>
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    <button onclick="app.adjustTaskTime(15)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-colors border border-slate-700">+ 15m</button>
+                                    <button onclick="app.adjustTaskTime(30)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-colors border border-slate-700">+ 30m</button>
+                                    <button onclick="app.adjustTaskTime(60)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-colors border border-slate-700">+ 1h</button>
+                                    <button onclick="app.adjustTaskTime('quarter_shift')" class="px-3 py-1.5 bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400 text-xs rounded-lg transition-colors border border-cyan-900/50">1/4 Turno</button>
+                                    <button onclick="app.adjustTaskTime('half_shift')" class="px-3 py-1.5 bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400 text-xs rounded-lg transition-colors border border-cyan-900/50">Mitad Turno</button>
+                                </div>
                                 <div>
                                     <label class="text-xs text-slate-400 block mb-1">Frecuencia de la rutina</label>
                                     <select onchange="app.updateForm('task', 'isOneOff', this.value === 'true'); if(this.value === 'true') app.updateForm('task', 'shiftFilter', 'all'); app.render();" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 text-sm md:text-base cursor-pointer focus:border-cyan-500 outline-none transition-colors">
@@ -794,12 +801,47 @@
             },
             clearOverride(date) { delete state.overrides[date]; state.modals.override = false; this.saveData(); this.render(); },
             
-            openAddAfterModal(baseTaskId) {
-                const baseTask = state.tasks.find(t=>t.id === baseTaskId) || { anchor: 'work_start', offset: 0, isSystem: true };
+            adjustTaskTime(action) {
                 const currentS = this.getShiftForDate(state.today);
-                const baseStr = baseTask.anchor === 'work_start' ? currentS.start : currentS.end;
-                const addedMins = baseTask.isSystem ? 0 : 15;
-                state.taskForm = { id: null, title: '', anchor: baseTask.anchor, offset: 0, icon: 'Activity', mode: 'time', timeValue: minsToTime(timeToMins(baseStr) + (baseTask.offset || 0) + addedMins), isOneOff: false, shiftFilter: 'all' };
+                const startMins = timeToMins(currentS.start);
+                let endMins = timeToMins(currentS.end);
+                if (endMins <= startMins && !currentS.isOff) endMins += 1440;
+                
+                let currentMins = timeToMins(state.taskForm.timeValue);
+                if (action === 'half_shift') {
+                    currentMins = startMins + Math.floor((endMins - startMins) / 2);
+                } else if (action === 'quarter_shift') {
+                    currentMins = startMins + Math.floor((endMins - startMins) / 4);
+                } else {
+                    currentMins += parseInt(action);
+                }
+                
+                state.taskForm.timeValue = minsToTime(currentMins);
+                this.render();
+            },
+
+            openAddAfterModal(baseTaskId) {
+                let baseAnchor = 'work_start';
+                let offset = 0;
+                let addMins = 15;
+                
+                if (baseTaskId === 'work_block_start') {
+                    baseAnchor = 'work_start'; offset = 0;
+                } else if (baseTaskId === 'work_block_end') {
+                    baseAnchor = 'work_end'; offset = 0;
+                } else {
+                    const task = state.tasks.find(t=>t.id === baseTaskId);
+                    if (task) {
+                        baseAnchor = task.anchor;
+                        offset = task.offset;
+                    }
+                }
+
+                const currentS = this.getShiftForDate(state.today);
+                const baseStr = baseAnchor === 'work_start' ? currentS.start : currentS.end;
+                const newMins = timeToMins(baseStr) + offset + addMins;
+                
+                state.taskForm = { id: null, title: '', anchor: baseAnchor, offset: 0, icon: 'Activity', mode: 'time', timeValue: minsToTime(newMins), isOneOff: false, shiftFilter: 'all' };
                 state.modals.task = true; this.render();
             },
             openEditModal(id) {
