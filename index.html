@@ -4,19 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Nube Mental | Tu RAM Externa</title>
+    
+    <!-- ENLACE AL MANIFEST (Para instalación PWA) -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    
+    <!-- Soporte iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="./icon.svg">
+
     <!-- Tailwind CSS (Se cachea para uso offline) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Correcciones de interfaz nativa para teléfonos */
         .h-screen-dvh { height: 100vh; height: 100dvh; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         body { -webkit-tap-highlight-color: transparent; }
-        
-        /* Padding inferior para iPhones y pantallas sin bordes */
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 1rem); }
-        
-        /* Animación fluida para modales emergentes */
         @keyframes slideUp {
             from { transform: translateY(100%); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
@@ -26,10 +32,38 @@
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans overflow-hidden">
     
-    <!-- Contenedor Principal Adaptativo -->
     <div id="app" class="flex flex-col md:flex-row h-screen-dvh w-full bg-slate-950 relative"></div>
 
     <script>
+        // ==========================================
+        // 0. REGISTRO DEL SERVICE WORKER (PWA)
+        // ==========================================
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrado con éxito.', reg.scope))
+                    .catch(err => console.log('Fallo en registro de Service Worker:', err));
+            });
+        }
+
+        // Función para Forzar Actualización (Botón de recarga)
+        async function forceAppUpdate() {
+            if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let registration of registrations) {
+                    await registration.unregister(); // Elimina el SW viejo
+                }
+            }
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                for (let name of cacheNames) {
+                    await caches.delete(name); // Borra toda la caché vieja
+                }
+            }
+            // Recarga saltándose la caché del navegador
+            window.location.reload(true);
+        }
+
         // ==========================================
         // 1. DICCIONARIO DE ÍCONOS SVG
         // ==========================================
@@ -119,16 +153,7 @@
         let state = {
             activeTab: 'timeline',
             today: getTodayStr(),
-            rotationConfig: { 
-                scheduleType: 'rotation_3', 
-                anchorDate: getRecentMondayStr(), 
-                anchorCycleId: 'cycle_night', 
-                fixedStart: '08:00', 
-                fixedEnd: '17:00', 
-                p223Start: '06:00', 
-                p223End: '18:00',
-                alarmsEnabled: false // NUEVO: Estado de alarmas
-            },
+            rotationConfig: { scheduleType: 'rotation_3', anchorDate: getRecentMondayStr(), anchorCycleId: 'cycle_night', fixedStart: '08:00', fixedEnd: '17:00', p223Start: '06:00', p223End: '18:00', alarmsEnabled: false },
             overrides: {}, tasks: [...defaultTasks], projects: [], logs: {},
             
             taskForm: { id: null, title: '', anchor: 'work_start', offset: 0, icon: 'Activity', mode: 'time', timeValue: '', isOneOff: false, shiftFilter: 'all' },
@@ -146,33 +171,23 @@
                 this.loadData();
                 this.render();
                 
-                // LOOP PRINCIPAL (Revisa cada minuto)
                 setInterval(() => {
                     const now = new Date();
                     const newToday = getTodayStr();
-                    
-                    // Cambio de día
                     if (newToday !== state.today) {
                         state.today = newToday;
                         this.render();
                     }
-
-                    // ALARMAS: Revisar si es hora de alguna tarea
-                    if (state.rotationConfig.alarmsEnabled && Notification.permission === "granted") {
+                    if (state.rotationConfig.alarmsEnabled && ("Notification" in window) && Notification.permission === "granted") {
                         const currentMins = now.getHours() * 60 + now.getMinutes();
                         const tasks = this.getCalculatedTasks();
-                        
                         tasks.forEach(t => {
-                            // Si no es sistema, coincide el minuto, y NO está marcada como hecha hoy
                             if (!t.isSystem && t.absoluteMins % 1440 === currentMins && !(state.logs[state.today] || []).includes(t.id)) {
-                                new Notification("Nube Mental", { 
-                                    body: "Hora de: " + t.title,
-                                    icon: "https://cdn-icons-png.flaticon.com/512/3233/3233483.png" // Icono genérico de cerebro/nube
-                                });
+                                new Notification("Nube Mental", { body: "Hora de: " + t.title, icon: "./icon.svg" });
                             }
                         });
                     }
-                }, 60000); // Revisa cada 60 segundos
+                }, 60000);
             },
             
             loadData() {
@@ -187,35 +202,24 @@
                 }
             },
             
-            saveData() {
-                localStorage.setItem('lifeTrack_data', JSON.stringify({ rotationConfig: state.rotationConfig, overrides: state.overrides, tasks: state.tasks, projects: state.projects, logs: state.logs }));
-            },
+            saveData() { localStorage.setItem('lifeTrack_data', JSON.stringify({ rotationConfig: state.rotationConfig, overrides: state.overrides, tasks: state.tasks, projects: state.projects, logs: state.logs })); },
 
-            // --- Google Calendar Export ---
             exportToCalendar(taskId) {
                 const task = this.getCalculatedTasks().find(t => t.id === taskId);
                 if (!task) return;
-                
                 const title = encodeURIComponent(task.title);
                 const desc = encodeURIComponent("Exportado desde Nube Mental (RAM Externa).");
-                
-                // Parse date logic
                 const [year, month, day] = state.today.split('-');
                 let dateObj = new Date(year, month - 1, day);
                 dateObj.setMinutes(dateObj.getMinutes() + task.absoluteMins);
-                
-                // Formato YYYYMMDDTHHMMSSZ (UTC)
                 const toUTCFormat = (d) => d.toISOString().replace(/-|:|\.\d\d\d/g, '');
-                
                 const startStr = toUTCFormat(dateObj);
-                const endObj = new Date(dateObj.getTime() + 30 * 60000); // Default 30 min duration
+                const endObj = new Date(dateObj.getTime() + 30 * 60000);
                 const endStr = toUTCFormat(endObj);
-                
                 const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startStr}/${endStr}&details=${desc}`;
                 window.open(url, '_blank');
             },
 
-            // --- Toggle Alarmas ---
             toggleAlarms(checked) {
                 if (checked) {
                     if (!("Notification" in window)) {
@@ -225,23 +229,22 @@
                     }
                     if (Notification.permission === "granted") {
                         this.updateConfig('alarmsEnabled', true);
-                        this.showDialog('alert', "Notificaciones activadas. Recibirás avisos a tiempo real.");
+                        this.showDialog('alert', "Notificaciones activadas.");
                     } else if (Notification.permission !== "denied") {
                         Notification.requestPermission().then(permission => {
                             if (permission === "granted") {
                                 this.updateConfig('alarmsEnabled', true);
-                                this.showDialog('alert', "¡Permiso concedido! Notificaciones de la Nube activadas.");
+                                this.showDialog('alert', "¡Permiso concedido!");
                             } else {
-                                this.showDialog('alert', "Permiso denegado. Habilita las notificaciones en tu navegador.");
+                                this.showDialog('alert', "Permiso denegado. Habilítalo en tu navegador.");
                                 this.updateConfig('alarmsEnabled', false);
                             }
-                        }).catch(e => {
-                            // Prevenir error en iframes restrictivos
-                            this.showDialog('alert', "El entorno actual bloquea el permiso. Abre la app en una pestaña completa o instálala.");
+                        }).catch(() => {
+                            this.showDialog('alert', "Entorno restrictivo. Abre en pestaña nueva o instala la app.");
                             this.updateConfig('alarmsEnabled', false);
                         });
                     } else {
-                        this.showDialog('alert', "Permiso denegado permanentemente. Cambia esto en los ajustes de tu navegador.");
+                        this.showDialog('alert', "Permiso denegado permanentemente en ajustes.");
                         this.updateConfig('alarmsEnabled', false);
                     }
                 } else {
@@ -249,7 +252,6 @@
                 }
             },
 
-            // Cálculo de Turnos
             getShiftForDate(dateStr) {
                 const targetDate = new Date(dateStr + 'T12:00:00');
                 const anchorDate = new Date(state.rotationConfig.anchorDate + 'T12:00:00');
@@ -336,7 +338,7 @@
                             <h1 class="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Nube Mental</h1>
                             <p class="text-xs text-slate-400 uppercase tracking-wider">Memoria Activa • ${state.today}</p>
                         </div>
-                        <button onclick="window.location.reload(true)" class="p-2 bg-slate-800 rounded-full text-slate-300 hover:text-white transition active:scale-95">${ICONS.RefreshCw}</button>
+                        <button onclick="forceAppUpdate()" class="p-2 bg-slate-800 rounded-full text-slate-300 hover:text-white transition active:scale-95">${ICONS.RefreshCw}</button>
                     </header>
                     
                     <aside class="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800 shrink-0" style="z-index: 10;">
@@ -344,12 +346,10 @@
                             <h1 class="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Nube Mental</h1>
                             <p class="text-xs text-slate-400 uppercase tracking-wider mt-1">Tu RAM Externa • ${state.today}</p>
                         </div>
-                        <nav class="flex-1 p-4 space-y-2">
-                            ${navItems}
-                        </nav>
+                        <nav class="flex-1 p-4 space-y-2">${navItems}</nav>
                         <div class="p-4 border-t border-slate-800">
-                            <button onclick="window.location.reload(true)" class="flex items-center justify-center gap-2 text-slate-400 hover:text-white transition w-full p-3 rounded-xl hover:bg-slate-800">
-                                <span class="w-4 h-4">${ICONS.RefreshCw}</span> <span class="text-sm font-medium">Sincronizar</span>
+                            <button onclick="forceAppUpdate()" class="flex items-center justify-center gap-2 text-slate-400 hover:text-white transition w-full p-3 rounded-xl hover:bg-slate-800">
+                                <span class="w-4 h-4">${ICONS.RefreshCw}</span> <span class="text-sm font-medium">Sincronizar (Actualizar)</span>
                             </button>
                         </div>
                     </aside>
@@ -361,9 +361,7 @@
                     </main>
 
                     <nav class="md:hidden fixed bottom-0 w-full bg-slate-900/95 backdrop-blur-md border-t border-slate-800 pb-safe" style="z-index: 40;">
-                        <div class="flex justify-around items-center p-2">
-                            ${navItems}
-                        </div>
+                        <div class="flex justify-around items-center p-2">${navItems}</div>
                     </nav>
 
                     ${this.renderModals()}
@@ -456,7 +454,7 @@
                                         <div class="flex gap-1 shrink-0">
                                             <button onclick="app.exportToCalendar('${task.id}')" title="Enviar a Google Calendar" class="p-2 text-indigo-400 bg-cyan-950/50 hover:bg-cyan-900 transition rounded-lg shrink-0">${ICONS.CalendarPlus}</button>
                                             <button onclick="app.openAddAfterModal('${task.id}')" title="Añadir rutina aquí" class="p-2 text-cyan-400 bg-cyan-950/50 hover:bg-cyan-900 transition rounded-lg shrink-0">${ICONS.Plus}</button>
-                                            <button onclick="app.showDialog('alert', 'Este es un Bloque Maestro. Su hora se define automáticamente basándose en tu ciclo de trabajo. Para cambiar su horario general, ve a la pestaña Sistema.')" title="Información del Sistema" class="p-2 text-slate-400 bg-cyan-950/50 hover:bg-cyan-900 transition rounded-lg shrink-0 hidden md:block">${ICONS.Settings}</button>
+                                            <button onclick="app.showDialog('alert', 'Este es un Bloque Maestro. Su hora se define en la pestaña Sistema.')" title="Información" class="p-2 text-slate-400 bg-cyan-950/50 hover:bg-cyan-900 transition rounded-lg shrink-0 hidden md:block">${ICONS.Settings}</button>
                                         </div>
                                     </div>
                                 </div>
@@ -486,7 +484,6 @@
                                     <div class="shrink-0 ml-1 transition-colors">${isCompleted ? `<span class="text-emerald-500">${ICONS.CheckCircle2}</span>` : `<span class="text-slate-700">${ICONS.Circle}</span>`}</div>
                                 </div>
                             </div>
-                            <!-- BOTONERA DERECHA: Ahora incluye Google Calendar -->
                             <div class="flex flex-col gap-1 shrink-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                 <button onclick="app.exportToCalendar('${task.id}')" title="Enviar a Google Calendar" class="p-2 text-indigo-400 bg-slate-900 border border-slate-800 rounded-lg hover:bg-indigo-900/30 active:scale-95 transition-all">${ICONS.CalendarPlus}</button>
                                 <button onclick="app.openAddAfterModal('${task.id}')" title="Añadir rutina aquí" class="p-2 text-cyan-400 bg-slate-900 border border-slate-800 rounded-lg hover:bg-cyan-900/30 active:scale-95 transition-all">${ICONS.Plus}</button>
@@ -555,10 +552,7 @@
                     
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
                         
-                        <!-- Columna Izquierda: Configuración -->
                         <div class="space-y-6">
-                            
-                            <!-- SECCIÓN NUEVA: ALARMAS Y NOTIFICACIONES -->
                             <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-sm border-l-4 border-l-amber-500">
                                 <h3 class="text-sm md:text-base font-medium text-slate-300 mb-3 flex items-center gap-2"><span class="text-amber-400">${ICONS.Bell}</span> Alertas Locales</h3>
                                 <p class="text-xs text-slate-400 mb-4 leading-relaxed">Permite a la Nube Mental enviarte notificaciones al dispositivo cuando sea la hora de una rutina.</p>
@@ -604,7 +598,6 @@
                             </div>
                         </div>
 
-                        <!-- Columna Derecha: Calendario -->
                         <div class="space-y-6">
                             <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-sm h-full flex flex-col">
                                 <h3 class="text-sm md:text-base font-medium text-slate-300 mb-4 flex items-center gap-2"><span class="text-cyan-400">${ICONS.CalendarCheck}</span> Previsión de Memoria (Calendario)</h3>
@@ -647,7 +640,6 @@
                                     <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Hora Exacta</label><input type="time" value="${tf.timeValue}" onchange="app.updateForm('task', 'timeValue', this.value); app.updateForm('task', 'mode', 'time')" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 cursor-pointer focus:border-cyan-500 outline-none transition-colors"></div>
                                     <div class="flex-1 min-w-0"><label class="text-xs text-slate-400 block mb-1">Refiere a:</label><select onchange="app.updateForm('task', 'anchor', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 cursor-pointer focus:border-cyan-500 outline-none transition-colors"><option value="work_start" ${tf.anchor=='work_start'?'selected':''}>Entrada</option><option value="work_end" ${tf.anchor=='work_end'?'selected':''}>Salida</option></select></div>
                                 </div>
-                                
                                 <div>
                                     <label class="text-xs text-slate-400 block mb-1">Frecuencia de la rutina</label>
                                     <select onchange="app.updateForm('task', 'isOneOff', this.value === 'true'); if(this.value === 'true') app.updateForm('task', 'shiftFilter', 'all'); app.render();" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 text-sm md:text-base cursor-pointer focus:border-cyan-500 outline-none transition-colors">
@@ -655,11 +647,9 @@
                                         <option value="true" ${tf.isOneOff ? 'selected' : ''}>Solo hoy (No repetir mañana)</option>
                                     </select>
                                 </div>
-
                                 ${!tf.isOneOff ? `
                                 <div><label class="text-xs text-slate-400 block mb-1">¿En qué turnos aparece?</label><select onchange="app.updateForm('task', 'shiftFilter', this.value)" class="w-full bg-slate-950 border border-slate-700 text-slate-100 rounded-xl p-3 md:p-4 text-sm md:text-base cursor-pointer focus:border-cyan-500 outline-none transition-colors"><option value="all" ${tf.shiftFilter === 'all' ? 'selected' : ''}>Siempre (Cualquier turno)</option>${shiftOptions}</select></div>
                                 ` : ''}
-                                
                                 <div class="pt-4 flex gap-3">
                                     ${tf.id ? `<button onclick="app.deleteTask('${tf.id}')" class="px-5 bg-slate-800 text-rose-500 rounded-xl hover:bg-rose-500/10 active:scale-95 transition-all flex items-center justify-center">${ICONS.Trash2}</button>` : ''}
                                     <button onclick="app.saveTask()" class="flex-1 text-white rounded-xl p-4 font-semibold text-base bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] transition-all shadow-lg shadow-emerald-900/20">Guardar Actividad</button>
@@ -723,7 +713,7 @@
                         <div class="absolute inset-0 bg-slate-950 bg-opacity-70 backdrop-blur-sm transition-opacity" onclick="app.closeDialog()"></div>
                         <div class="relative bg-slate-900 w-[90%] md:w-[400px] rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-800 slide-up text-center">
                             <div class="mb-5 flex justify-center text-cyan-400 scale-125">
-                                ${state.dialog.type === 'confirm' ? ICONS.AlertTriangle : ICONS.Bell}
+                                ${state.dialog.type === 'confirm' ? ICONS.AlertTriangle : (state.dialog.type === 'info' ? ICONS.Activity : ICONS.Bell)}
                             </div>
                             <h3 class="text-lg md:text-xl font-bold text-slate-100 mb-3">${state.dialog.type === 'confirm' ? 'Confirmar Acción' : 'Aviso del Sistema'}</h3>
                             <p class="text-slate-400 text-sm md:text-base mb-8 leading-relaxed">${state.dialog.message}</p>
