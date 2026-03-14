@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="cloud" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#22d3ee" />
+    </linearGradient>
+  </defs>
+  <!-- Fondo oscuro -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  
+  <!-- Nube/Cerebro estilizado -->
+  <path d="M376 272c0-44.18-35.82-80-80-80-5.74 0-11.31.66-16.66 1.83C268.42 153.94 233.51 128 192 128c-53.02 0-96 42.98-96 96 0 8.01 1.05 15.77 2.96 23.16C71.39 257.65 52 284.15 52 316c0 41.97 34.03 76 76 76h240c48.6 0 88-39.4 88-88 0-33.15-18.42-61.9-45.03-76.35.68-4.82 1.03-9.75 1.03-14.85z" fill="url(#cloud)" opacity="0.9"/>
+  
+  <!-- Nodos de conexión (Símbolo de RAM/Conexión neural) -->
+  <circle cx="160" cy="240" r="16" fill="#0f172a"/>
+  <circle cx="256" cy="208" r="20" fill="#0f172a"/>
+  <circle cx="336" cy="272" r="16" fill="#0f172a"/>
+  <circle cx="224" cy="304" r="16" fill="#0f172a"/>
+  
+  <path d="M160 240l96-32 80 64-112 32-64-64z" fill="none" stroke="#0f172a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
