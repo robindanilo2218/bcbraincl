@@ -1,0 +1,18 @@
+{
+  "name": "Nube Mental | RAM Externa",
+  "short_name": "Nube Mental",
+  "description": "Tu sistema personal de gestión cognitiva, rutinas y proyectos offline.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
